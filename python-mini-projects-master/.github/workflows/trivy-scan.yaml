@@ -22,5 +22,5 @@ jobs:
           security-checks: 'vuln,config,secret'  # Kiểm tra vulnerabilities, misconfigurations, secrets
           format: 'table'  # Định dạng output (có thể thay bằng 'json' nếu cần)
           exit-code: '1'    # Fail workflow nếu tìm thấy lỗ hổng nghiêm trọng
-          severity: 'CRITICAL,HIGH'  # Chỉ fail nếu có lỗi CRITICAL/HIGH
+          severity: 'CRITICAL,HIGH' 
           ignore-unfixed: true  # Bỏ qua các lỗi chưa có bản fix
