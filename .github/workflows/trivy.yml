@@ -84,7 +84,8 @@ jobs:
         with:
           scan-type: 'fs'
           security-checks: 'vuln,config,secret'
-          format: 'table'
+          format: 'json'
+          output: './trivy-scan-results.json'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
 
