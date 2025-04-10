@@ -51,4 +51,3 @@ tensorflow==2.6.4
 tqdm==4.48.2
 tweepy==3.9.0
 urllib3==1.26.5
-utils==1.0.1
