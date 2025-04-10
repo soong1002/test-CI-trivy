@@ -1,25 +1,42 @@
-name: Trivy Security Scan
+name: Trivy Security Scan with Scheduled DB Update
 
 on:
   push:
-    branches: [ "main", "master" ]  # Chạy khi có thay đổi trên main/master
+    branches: [ "main", "master" ]  
   pull_request:
-    branches: [ "main", "master" ]  # Chạy khi có PR vào main/master
+    branches: [ "main", "master" ]  
+  schedule:
+    - cron: '0 */6 * * *'  # Chạy mỗi 6 giờ (UTC) chỉ để update DB
 
 jobs:
-  trivy-scan:
-    name: Run Trivy Scanner
+  update-db:  # Job riêng chỉ để update DB
+    name: Update Trivy Database
     runs-on: ubuntu-latest
-
+    if: github.event_name == 'schedule'  # Chỉ chạy khi là scheduled event
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Trivy vulnerability scanner
+      - name: Update Trivy DB
+        run: |
+          trivy --cache-dir /tmp/trivy-cache image --download-db-only
+          echo "Trivy DB updated at $(date)" >> db-update.log
+
+  trivy-scan:  # Job riêng để scan code
+    name: Run Trivy Scanner
+    runs-on: ubuntu-latest
+    needs: update-db  # Đảm bảo DB luôn được cập nhật trước khi scan
+    if: github.event_name != 'schedule'  
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy Scan
         uses: aquasecurity/trivy-action@0.30.0
         with:
-          scan-type: 'fs'  # Scan filesystem (source code, bao gồm cả dependency)
-          security-checks: 'vuln,config,secret'  # Kiểm tra vulnerabilities, misconfigurations, secrets
-          format: 'table'  # Định dạng output (có thể thay bằng 'json' nếu cần)
-          severity: 'CRITICAL,HIGH' 
-          ignore-unfixed: true  # Bỏ qua các lỗi chưa có bản fix
+          scan-type: 'fs'
+          security-checks: 'vuln,config,secret'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+          cache-dir: '/tmp/trivy-cache'  # Sử dụng DB đã được update
