@@ -2,55 +2,24 @@ name: Trivy Security Scan
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master" ]  
   pull_request:
-    branches: [ "main", "master" ]
-  schedule:
-    - cron: '0 */6 * * *'  # DB update định kỳ 6h/lần
+    branches: [ "main", "master" ]  
 
 jobs:
   trivy-scan:
     name: Run Trivy Scanner
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Bước 1: Kiểm tra và update DB nếu cần
-      - name: Conditionally Update DB
-        id: check-db
-        run: |
-          # Tạo thư mục cache nếu chưa có
-          mkdir -p /tmp/trivy-cache/db
-          
-          # Kiểm tra thời gian sửa đổi cuối của file DB
-          DB_FILE="/tmp/trivy-cache/db/trivy.db"
-          if [ -f "$DB_FILE" ]; then
-            DB_AGE=$(( $(date +%s) - $(stat -c %Y "$DB_FILE") ))
-          else
-            DB_AGE=999999  # File không tồn tại -> cần update
-          fi
-
-          # Update nếu:
-          # - Là scheduled event HOẶC
-          # - DB cũ hơn 6 tiếng (21600 giây)
-          if [ "${{ github.event_name }}" == "schedule" ] || [ $DB_AGE -gt 21600 ]; then
-            echo "Updating Trivy DB..."
-            trivy --cache-dir /tmp/trivy-cache image --download-db-only
-            echo "::set-output name=db_updated::true"
-          else
-            echo "Using recent DB (updated $((DB_AGE/3600))h ago)"
-            echo "::set-output name=db_updated::false"
-          fi
-
-      # Bước 2: Chỉ scan khi là push/pull request
-      - name: Run Trivy Scan
-        if: github.event_name != 'schedule'
+      - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.30.0
         with:
-          scan-type: 'fs'
-          security-checks: 'vuln,config,secret'
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
-          ignore-unfixed: true
-          cache-dir: '/tmp/trivy-cache'
+          scan-type: 'fs'  # Scan filesystem (source code, bao gồm cả dependency)
+          security-checks: 'vuln,config,secret'  # Kiểm tra vulnerabilities, misconfigurations, secrets
+          format: 'table'  
+          severity: 'CRITICAL,HIGH' 
+          ignore-unfixed: true  
