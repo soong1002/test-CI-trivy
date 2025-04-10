@@ -1,3 +1,13 @@
+name: Trivy Security Scan
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  schedule:
+    - cron: '*/5 * * * *'
+
 jobs:
   update-trivy-db:
     name: Update Trivy DB
@@ -50,3 +60,37 @@ jobs:
         with:
           path: .last_update
           key: trivy-last-update
+
+      - name: Cache Trivy DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            trivy-db-${{ runner.os }}-
+
+  trivy-scan:
+    name: Run Trivy Scanner
+    needs: update-trivy-db
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Restore Trivy DB cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            trivy-db-${{ runner.os }}-
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          scan-type: 'fs'
+          security-checks: 'vuln,config,secret'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
