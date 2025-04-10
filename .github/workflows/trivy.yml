@@ -6,14 +6,60 @@ on:
   pull_request:
     branches: [ "main", "master" ]
   schedule:
-    - cron: '*/5 * * * *'  # Cứ 5p chạy 1 lần
+    - cron: '*/5 * * * *'
+
+permissions:
+  actions: write
+  contents: read
 
 jobs:
   update-trivy-db:
     name: Update Trivy DB
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule'
+    outputs:
+      should_update: ${{ steps.check_time.outputs.should_update }}
     steps:
+      - name: Get current timestamp
+        id: get_timestamp
+        run: echo "timestamp=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Check last update time
+        id: check_time
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const cache = require('@actions/cache');
+            const KEY = 'trivy-db-last-update';
+            
+            try {
+              const lastUpdate = await cache.restoreCache(
+                ['.last_update'],
+                KEY
+              );
+              
+              if (lastUpdate) {
+                const lastTimestamp = parseInt(fs.readFileSync('.last_update', 'utf8'));
+                const currentTimestamp = parseInt('${{ steps.get_timestamp.outputs.timestamp }}');
+                const fiveMinutes = 5 * 60;
+                
+                if (currentTimestamp - lastTimestamp < fiveMinutes) {
+                  console.log('Skipping DB update - last update was less than 5 minutes ago');
+                  return false;
+                }
+              }
+              return true;
+            } catch (error) {
+              console.log('Error checking last update time', error);
+              return true;
+            }
+
+      - name: Update Trivy DB
+        if: steps.check_time.outputs.should_update == 'true'
+        run: |
+          trivy image --download-db-only
+          echo "${{ steps.get_timestamp.outputs.timestamp }}" > .last_update
+          cache.saveCache(['.last_update'], 'trivy-db-last-update')
+
       - name: Cache Trivy DB
         uses: actions/cache@v4
         with:
@@ -22,11 +68,9 @@ jobs:
           restore-keys: |
             trivy-db-${{ runner.os }}-
 
-      - name: Update Trivy DB
-        run: trivy image --download-db-only
-
   trivy-scan:
     name: Run Trivy Scanner
+    needs: update-trivy-db
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
