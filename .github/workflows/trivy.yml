@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ "main", "master" ]
   schedule:
-    - cron: '*/2 * * * *'  # Cập nhật mỗi 2 phút
+    - cron: '*/3 * * * *'  # Cập nhật mỗi 3 phút
 
 permissions:
   actions: write
