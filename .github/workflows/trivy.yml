@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ "main", "master" ]
   schedule:
-    - cron: '0 */6 * * *'  # Cứ 6 tiếng chạy 1 lần
+    - cron: '*/5 * * * *'  # Cứ 5p chạy 1 lần
 
 jobs:
   update-trivy-db:
