@@ -8,57 +8,50 @@ on:
   schedule:
     - cron: '*/5 * * * *'
 
-permissions:
-  actions: write
-  contents: read
-
 jobs:
   update-trivy-db:
     name: Update Trivy DB
     runs-on: ubuntu-latest
     outputs:
-      should_update: ${{ steps.check_time.outputs.should_update }}
-    steps:
-      - name: Get current timestamp
-        id: get_timestamp
-        run: echo "timestamp=$(date +%s)" >> $GITHUB_OUTPUT
+      should_update: ${{ steps.should_update.outputs.result }}
 
-      - name: Check last update time
-        id: check_time
-        uses: actions/github-script@v6
+    steps:
+      - name: Checkout (to read/write .last_update)
+        uses: actions/checkout@v4
+
+      - name: Restore last update timestamp
+        uses: actions/cache@v4
         with:
-          script: |
-            const cache = require('@actions/cache');
-            const KEY = 'trivy-db-last-update';
-            
-            try {
-              const lastUpdate = await cache.restoreCache(
-                ['.last_update'],
-                KEY
-              );
-              
-              if (lastUpdate) {
-                const lastTimestamp = parseInt(fs.readFileSync('.last_update', 'utf8'));
-                const currentTimestamp = parseInt('${{ steps.get_timestamp.outputs.timestamp }}');
-                const fiveMinutes = 5 * 60;
-                
-                if (currentTimestamp - lastTimestamp < fiveMinutes) {
-                  console.log('Skipping DB update - last update was less than 5 minutes ago');
-                  return false;
-                }
-              }
-              return true;
-            } catch (error) {
-              console.log('Error checking last update time', error);
-              return true;
-            }
+          path: .last_update
+          key: trivy-last-update
+
+      - name: Determine if DB should be updated
+        id: should_update
+        run: |
+          now=$(date +%s)
+          if [ -f .last_update ]; then
+            last=$(cat .last_update)
+            diff=$((now - last))
+            echo "Last update: $diff seconds ago"
+            if [ "$diff" -lt 300 ]; then
+              echo "result=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+          echo "result=true" >> $GITHUB_OUTPUT
 
       - name: Update Trivy DB
-        if: steps.check_time.outputs.should_update == 'true'
+        if: steps.should_update.outputs.result == 'true'
         run: |
           trivy image --download-db-only
-          echo "${{ steps.get_timestamp.outputs.timestamp }}" > .last_update
-          cache.saveCache(['.last_update'], 'trivy-db-last-update')
+          date +%s > .last_update
+
+      - name: Save last update timestamp
+        if: steps.should_update.outputs.result == 'true'
+        uses: actions/cache@v4
+        with:
+          path: .last_update
+          key: trivy-last-update
 
       - name: Cache Trivy DB
         uses: actions/cache@v4
@@ -72,6 +65,7 @@ jobs:
     name: Run Trivy Scanner
     needs: update-trivy-db
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
