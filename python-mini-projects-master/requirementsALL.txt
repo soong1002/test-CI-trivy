@@ -49,4 +49,3 @@ sumeval==0.2.2
 sumy==0.8.1
 tensorflow==2.6.4
 tqdm==4.48.3
-tweepy==3.9.0
