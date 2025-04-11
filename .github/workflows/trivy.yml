@@ -84,6 +84,7 @@ jobs:
           security-checks: 'vuln,config,secret'
           format: 'json'
           output: './trivy-scan-results.json'
+          output: 'table'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
 
